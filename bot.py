@@ -31,16 +31,18 @@ except ImportError:
 
 # Force reload environment variables
 load_dotenv()
-DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
-DISCORD_APP_ID = os.getenv('DISCORD_APP_ID')
-DISCORD_GUILD_ID = os.getenv('DISCORD_GUILD_ID')
-WEB_URL = os.getenv('WEB_URL', 'http://localhost:8080')
 
-# Debug prints to verify variables are loaded
-print(f"🔑 TOKEN loaded: {bool(DISCORD_TOKEN)}")
-print(f"📱 APP_ID: {DISCORD_APP_ID}")
-print(f"🏠 GUILD_ID: {DISCORD_GUILD_ID}")
-print(f"🌐 WEB_URL: {WEB_URL}")
+# ============================================
+# 📋 CONFIGURATION - Edit these values directly
+# ============================================
+
+# 🔑 Discord Bot Configuration (PUT YOUR TOKENS HERE)
+DISCORD_TOKEN = "MTUzMTQxNzI0MTI2MDY1ODc0OA.GuUQdl.J1SMnT66pzY2KaiCKN7JItP7CK5OgrA9Cg3oys"
+DISCORD_APP_ID = "1531417241260658748"
+DISCORD_GUILD_ID = "1528402783194058792"
+
+# 🌐 Web Server Configuration
+WEB_URL = "https://web-production-a64dd.up.railway.app"
 
 # ============================================
 # 📦 IMPORTS
@@ -78,6 +80,12 @@ except ImportError:
     import discord
     from discord import app_commands
     from discord.ext import commands
+
+# Print configuration status
+print(f"🔑 TOKEN loaded: {bool(DISCORD_TOKEN)}")
+print(f"📱 APP_ID: {DISCORD_APP_ID}")
+print(f"🏠 GUILD_ID: {DISCORD_GUILD_ID}")
+print(f"🌐 WEB_URL: {WEB_URL}")
 
 # ============================================
 # 🎯 SYNC WATCH SYSTEM - WebSocket Manager
