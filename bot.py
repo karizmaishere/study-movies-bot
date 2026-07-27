@@ -13,36 +13,22 @@ from datetime import datetime
 import base64
 
 # ============================================
-# 🔑 FORCE LOAD ENVIRONMENT VARIABLES
+# 🔑 READ TOKEN FROM RAILWAY VARIABLES ONLY
 # ============================================
 
-try:
-    from dotenv import load_dotenv
-    env_path = Path(__file__).parent / '.env'
-    if env_path.exists():
-        load_dotenv(env_path)
-except ImportError:
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "python-dotenv"])
-    from dotenv import load_dotenv
-    env_path = Path(__file__).parent / '.env'
-    if env_path.exists():
-        load_dotenv(env_path)
+# ONLY TOKEN is read from Railway Variables
+DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
 
-# Force reload environment variables
-load_dotenv()
-
-# ============================================
-# 📋 CONFIGURATION - Edit these values directly
-# ============================================
-
-# 🔑 Discord Bot Configuration (PUT YOUR TOKENS HERE)
-DISCORD_TOKEN = "MTUzMTQxNzI0MTI2MDY1ODc0OA.Gwq8GW.3cYDunHTpYZ4YpfBN2ksOusheyPTU8D4yBqwPY"
+# APP_ID and GUILD_ID are hardcoded in the code
 DISCORD_APP_ID = "1531417241260658748"
 DISCORD_GUILD_ID = "1528402783194058792"
+WEB_URL = os.environ.get('WEB_URL', 'https://web-production-a64dd.up.railway.app')
 
-# 🌐 Web Server Configuration
-WEB_URL = "https://web-production-a64dd.up.railway.app"
+# Print configuration status
+print(f"🔑 TOKEN loaded: {bool(DISCORD_TOKEN)}")
+print(f"📱 APP_ID: {DISCORD_APP_ID}")
+print(f"🏠 GUILD_ID: {DISCORD_GUILD_ID}")
+print(f"🌐 WEB_URL: {WEB_URL}")
 
 # ============================================
 # 📦 IMPORTS
@@ -80,12 +66,6 @@ except ImportError:
     import discord
     from discord import app_commands
     from discord.ext import commands
-
-# Print configuration status
-print(f"🔑 TOKEN loaded: {bool(DISCORD_TOKEN)}")
-print(f"📱 APP_ID: {DISCORD_APP_ID}")
-print(f"🏠 GUILD_ID: {DISCORD_GUILD_ID}")
-print(f"🌐 WEB_URL: {WEB_URL}")
 
 # ============================================
 # 🎯 SYNC WATCH SYSTEM - WebSocket Manager
@@ -1588,8 +1568,6 @@ async def handle_index(request):
 # ============================================
 # 🚀 Main
 # ============================================
-
-# Note: playwright_session_manager is not used in this version
 
 async def on_shutdown(app):
     await bot.close()
