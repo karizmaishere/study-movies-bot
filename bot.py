@@ -1611,7 +1611,7 @@ async def run_web_server():
 
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8080)
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
 
     return runner
