@@ -92,7 +92,7 @@ class SyncWatchManager:
                 'host': host_ws,
                 'viewers': [],
                 'state': {
-                    'video': None,  # vid or url
+                    'video': None,
                     'playing': False,
                     'currentTime': 0,
                     'duration': 0,
@@ -113,9 +113,7 @@ class SyncWatchManager:
             room = self.rooms[room_id]
             if viewer_ws not in room['viewers'] and viewer_ws != room['host']:
                 room['viewers'].append(viewer_ws)
-                # إرسال الحالة الحالية للمشاهد الجديد
                 await self.send_state_to_viewer(viewer_ws, room)
-                # إعلام المضيف بمشاهد جديد
                 await self.notify_host_new_viewer(room)
             return True
     
@@ -128,11 +126,9 @@ class SyncWatchManager:
             room = self.rooms[room_id]
             
             if ws == room['host']:
-                # المضيف غادر - إغلاق الغرفة
                 await self.close_room(room_id)
                 return
             
-            # مشاهد غادر
             if ws in room['viewers']:
                 room['viewers'].remove(ws)
                 await self.notify_host_viewer_left(room)
@@ -144,7 +140,6 @@ class SyncWatchManager:
                 return
             room = self.rooms[room_id]
             
-            # إغلاق جميع الاتصالات
             for viewer in room['viewers']:
                 try:
                     await viewer.close()
@@ -195,39 +190,19 @@ class SyncWatchManager:
             except:
                 pass
     
-    async def broadcast_to_viewers(self, room_id, message, exclude_host=False):
-        """بث رسالة لكل المشاهدين (ليس المضيف)"""
-        async with self.room_lock:
-            if room_id not in self.rooms:
-                return
-            room = self.rooms[room_id]
-            
-            viewers = room['viewers']
-            if exclude_host:
-                # لا نرسل للمضيف
-                pass
-            
-            for viewer in viewers:
-                try:
-                    await viewer.send_json(message)
-                except:
-                    pass
-    
     async def broadcast_to_room(self, room_id, message, exclude_ws=None):
-        """بث رسالة لكل الغرفة (مضيف + مشاهدين)"""
+        """بث رسالة لكل الغرفة"""
         async with self.room_lock:
             if room_id not in self.rooms:
                 return
             room = self.rooms[room_id]
             
-            # إرسال للمضيف
             if room['host'] and room['host'] != exclude_ws:
                 try:
                     await room['host'].send_json(message)
                 except:
                     pass
             
-            # إرسال للمشاهدين
             for viewer in room['viewers']:
                 if viewer != exclude_ws:
                     try:
@@ -242,7 +217,6 @@ class SyncWatchManager:
                 return
             room = self.rooms[room_id]
             
-            # تحديث الحالة
             if 'video' in new_state:
                 room['state']['video'] = new_state['video']
             if 'playing' in new_state:
@@ -258,28 +232,24 @@ class SyncWatchManager:
             if 'servers' in new_state:
                 room['state']['servers'] = new_state['servers']
         
-        # بث التحديث للجميع عدا المرسل
         await self.broadcast_to_room(room_id, {
             'type': 'state_update',
             'state': room['state']
         }, exclude_ws=sender_ws)
     
     async def get_room_state(self, room_id):
-        """الحصول على حالة الغرفة"""
         async with self.room_lock:
             if room_id not in self.rooms:
                 return None
             return self.rooms[room_id]['state']
     
     def is_host(self, ws):
-        """التحقق من أن WebSocket هو المضيف"""
         for room in self.rooms.values():
             if room['host'] == ws:
                 return True
         return False
     
     def get_room_for_ws(self, ws):
-        """الحصول على الغرفة التي ينتمي لها WebSocket"""
         for room_id, room in self.rooms.items():
             if room['host'] == ws or ws in room['viewers']:
                 return room_id
@@ -292,7 +262,6 @@ class SyncWatchManager:
 sync_manager = SyncWatchManager()
 
 async def handle_websocket(request):
-    """معالج WebSocket للمزامنة"""
     ws = web.WebSocketResponse()
     await ws.prepare(request)
     
@@ -309,7 +278,6 @@ async def handle_websocket(request):
                     action = data.get('action', '')
                     
                     if action == 'create_room':
-                        # إنشاء غرفة جديدة (المضيف)
                         room_id = await sync_manager.create_room(ws)
                         is_host = True
                         await ws.send_json({
@@ -320,7 +288,6 @@ async def handle_websocket(request):
                         print(f"[WebSocket] Room created: {room_id}")
                     
                     elif action == 'join_room':
-                        # انضمام مشاهد
                         room_to_join = data.get('room_id')
                         if room_to_join:
                             success = await sync_manager.join_room(room_to_join, ws)
@@ -339,13 +306,11 @@ async def handle_websocket(request):
                                 })
                     
                     elif action == 'sync_update':
-                        # تحديث من المضيف فقط
                         if sync_manager.is_host(ws) and room_id:
                             new_state = data.get('state', {})
                             await sync_manager.update_state(room_id, new_state, ws)
                     
                     elif action == 'leave_room':
-                        # مغادرة الغرفة
                         await sync_manager.leave_room(ws)
                         room_id = None
                         is_host = False
@@ -354,7 +319,6 @@ async def handle_websocket(request):
                         })
                     
                     elif action == 'get_room_state':
-                        # طلب الحالة الحالية
                         if room_id:
                             state = await sync_manager.get_room_state(room_id)
                             if state:
@@ -373,7 +337,6 @@ async def handle_websocket(request):
                 print(f"[WebSocket] Error: {ws.exception()}")
     
     finally:
-        # تنظيف عند قطع الاتصال
         await sync_manager.leave_room(ws)
         print(f"[WebSocket] Connection closed for {request.remote}")
     
@@ -604,7 +567,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
     </section>
     
     <div class="container">
-        <!-- فيديو -->
         <div class="video-container" id="videoContainer">
             <div class="video-wrapper">
                 <video id="videoPlayer" playsinline webkit-playsinline></video>
@@ -624,14 +586,12 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
         </div>
         
-        <!-- سيرفرات -->
         <div class="servers-container" id="serversContainer">
             <div style="width:100%;text-align:center;color:rgba(255,255,255,0.2);font-size:0.8rem;">
                 🔄 انتظر اختيار السيرفر...
             </div>
         </div>
         
-        <!-- المشاهدين -->
         <div class="movie-info">
             <h3>👥 المشاهدين</h3>
             <div class="viewers-list" id="viewersList">
@@ -646,18 +606,12 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
     
     <script>
-        // ============================================
-        // SYNC WATCH - Client Side
-        // ============================================
-        
         const WS_URL = window.location.origin.replace('http', 'ws') + '/ws';
         let ws = null;
         let roomId = null;
         let isHost = false;
         let currentState = { video: null, playing: false, currentTime: 0, duration: 0, title: '', servers: [], server_index: 0 };
-        let videoLoaded = false;
         
-        // DOM Elements
         const video = document.getElementById('videoPlayer');
         const playPauseBtn = document.getElementById('playPauseBtn');
         const progressBar = document.getElementById('progressBar');
@@ -671,10 +625,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
         const serversContainer = document.getElementById('serversContainer');
         const movieInfoText = document.getElementById('movieInfoText');
         
-        // ============================================
-        // WebSocket Connection
-        // ============================================
-        
         function connectWebSocket() {
             ws = new WebSocket(WS_URL);
             
@@ -683,18 +633,15 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                 roomStatus.textContent = '🟢 متصل';
                 roomStatus.style.color = '#2ecc71';
                 
-                // التحقق إذا كان هناك room في URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const roomParam = urlParams.get('room');
                 
                 if (roomParam) {
-                    // انضمام لغرفة موجودة
                     ws.send(JSON.stringify({
                         action: 'join_room',
                         room_id: roomParam
                     }));
                 } else {
-                    // إنشاء غرفة جديدة
                     ws.send(JSON.stringify({
                         action: 'create_room'
                     }));
@@ -714,8 +661,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                 console.log('[WS] Disconnected');
                 roomStatus.textContent = '🔴 غير متصل';
                 roomStatus.style.color = '#e74c3c';
-                
-                // محاولة إعادة الاتصال بعد 3 ثواني
                 setTimeout(connectWebSocket, 3000);
             };
             
@@ -723,10 +668,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                 console.error('[WS] Error:', error);
             };
         }
-        
-        // ============================================
-        // WebSocket Message Handler
-        // ============================================
         
         function handleWebSocketMessage(data) {
             console.log('[WS] Message:', data);
@@ -736,7 +677,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                     roomId = data.room_id;
                     isHost = true;
                     updateUIForHost();
-                    // تحديث URL بدون إعادة تحميل
                     const newUrl = window.location.pathname + '?room=' + roomId;
                     window.history.pushState({room: roomId}, '', newUrl);
                     break;
@@ -748,7 +688,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                     break;
                     
                 case 'sync_state':
-                    // استلام الحالة الكاملة عند الانضمام
                     if (data.state) {
                         currentState = data.state;
                         applyStateToPlayer(currentState);
@@ -756,7 +695,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                     break;
                     
                 case 'state_update':
-                    // تحديث من المضيف
                     if (data.state) {
                         currentState = data.state;
                         applyStateToPlayer(currentState);
@@ -764,7 +702,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                     break;
                     
                 case 'room_state':
-                    // طلب الحالة
                     if (data.state) {
                         currentState = data.state;
                         applyStateToPlayer(currentState);
@@ -782,16 +719,8 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                 case 'error':
                     alert('❌ ' + data.message);
                     break;
-                    
-                case 'pong':
-                    // لا حاجة
-                    break;
             }
         }
-        
-        // ============================================
-        // UI Updates
-        // ============================================
         
         function updateUIForHost() {
             roleBadge.textContent = '👑 مضيف';
@@ -799,7 +728,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
             roomInfo.textContent = 'أنت المضيف 🎯 - يمكنك التحكم في الفيلم';
             document.getElementById('videoControls').style.opacity = '1';
             
-            // إظهار السيرفرات للمضيف
             serversContainer.querySelectorAll('.server-btn').forEach(btn => {
                 btn.classList.remove('disabled');
             });
@@ -810,48 +738,37 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
             roleBadge.className = 'badge badge-viewer';
             roomInfo.textContent = 'أنت مشاهد - تابع مع المضيف 🎬';
             
-            // إخفاء أزرار التحكم للمشاهدين
             document.querySelectorAll('.server-btn').forEach(btn => {
                 btn.classList.add('disabled');
             });
         }
         
         function updateViewerCount(count) {
-            const countText = count ? ` (${count} مشاهد)` : '';
             viewersList.innerHTML = `
                 <span class="viewer-badge host">👑 المضيف</span>
-                <span style="color:rgba(255,255,255,0.3);font-size:0.9rem;">+ ${count || 0} مشاهد${countText}</span>
+                <span style="color:rgba(255,255,255,0.3);font-size:0.9rem;">+ ${count || 0} مشاهد</span>
             `;
         }
-        
-        // ============================================
-        // Video Player
-        // ============================================
         
         function applyStateToPlayer(state) {
             if (!state) return;
             
-            // تحديث معلومات الفيلم
             if (state.title) {
                 movieInfoText.textContent = '🎬 ' + state.title;
             }
             
-            // تحديث السيرفرات
             if (state.servers && state.servers.length > 0) {
                 renderServers(state.servers, state.server_index || 0);
             }
             
-            // تحميل الفيديو إذا تغير
             if (state.video && currentState.video !== state.video) {
                 loadVideo(state.video);
             }
             
-            // تحديث التقدم
             if (state.currentTime !== undefined) {
                 video.currentTime = state.currentTime;
             }
             
-            // تحديث التشغيل/الإيقاف
             if (state.playing !== undefined) {
                 if (state.playing) {
                     video.play().catch(() => {});
@@ -862,7 +779,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             }
             
-            // تحديث الحالة المحلية
             currentState = state;
         }
         
@@ -904,7 +820,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
             
             serversContainer.innerHTML = html;
             
-            // إضافة أحداث النقر للمضيف فقط
             if (isHost) {
                 serversContainer.querySelectorAll('.server-btn:not(.disabled)').forEach(btn => {
                     btn.addEventListener('click', function() {
@@ -923,22 +838,15 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
             currentState.server_index = index;
             currentState.video = serverUrl;
             
-            // إرسال التحديث للمشاهدين
             ws.send(JSON.stringify({
                 action: 'sync_update',
                 state: currentState
             }));
             
-            // تحديث محلي
             renderServers(currentState.servers, index);
             loadVideo(serverUrl);
         }
         
-        // ============================================
-        // Video Controls (Host Only)
-        // ============================================
-        
-        // Play/Pause
         playPauseBtn.addEventListener('click', function() {
             if (!isHost) return;
             
@@ -952,14 +860,12 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                 playPauseBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
             }
             
-            // إرسال التحديث للمشاهدين
             ws.send(JSON.stringify({
                 action: 'sync_update',
                 state: currentState
             }));
         });
         
-        // Progress Bar - تحديث التقدم
         video.addEventListener('timeupdate', function() {
             if (video.duration) {
                 const progress = (video.currentTime / video.duration) * 100;
@@ -970,11 +876,9 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
                 videoTime.textContent = current + ' / ' + duration;
             }
             
-            // تحديث الحالة وإرسالها للمشاهدين (بشكل محدود)
             if (isHost && video.duration) {
                 currentState.currentTime = video.currentTime;
                 currentState.duration = video.duration;
-                // نرسل التحديث كل 5 ثواني فقط لتقليل الضغط
                 if (Math.floor(video.currentTime) % 5 === 0 || !currentState._lastSync) {
                     currentState._lastSync = video.currentTime;
                     ws.send(JSON.stringify({
@@ -985,7 +889,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
             }
         });
         
-        // Click on progress bar (Host only)
         videoProgress.addEventListener('click', function(e) {
             if (!isHost) return;
             
@@ -1000,10 +903,6 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
             }));
         });
         
-        // ============================================
-        // Helpers
-        // ============================================
-        
         function formatTime(seconds) {
             if (isNaN(seconds)) return '0:00';
             const mins = Math.floor(seconds / 60);
@@ -1011,13 +910,8 @@ SYNC_HTML_TEMPLATE = """<!DOCTYPE html>
             return mins + ':' + (secs < 10 ? '0' : '') + secs;
         }
         
-        // ============================================
-        // Init
-        // ============================================
-        
         connectWebSocket();
         
-        // استعادة حالة الفيديو إذا كان موجودًا
         video.addEventListener('loadedmetadata', function() {
             if (currentState.currentTime) {
                 video.currentTime = currentState.currentTime;
@@ -1513,7 +1407,6 @@ async def handle_new_movies(request):
     return web.json_response(result)
 
 async def handle_sync(request):
-    """صفحة المشاهدة الجماعية"""
     vid = request.query.get('vid', '').strip()
     
     if vid:
@@ -1522,32 +1415,25 @@ async def handle_sync(request):
         title = movie_info.get('title', 'فيلم')
         servers_json = json.dumps(servers)
         
-        # نعدل الـ HTML ونضيف معلومات الفيلم
         html = SYNC_HTML_TEMPLATE
-        # نضيف JavaScript لتحميل الفيلم تلقائياً
         html = html.replace(
             '</body>',
             f'''
             <script>
-                // تحميل الفيلم تلقائياً للمضيف
                 document.addEventListener('DOMContentLoaded', function() {{
-                    // انتظار اتصال WebSocket
                     const checkWS = setInterval(function() {{
                         if (ws && ws.readyState === WebSocket.OPEN && isHost) {{
                             clearInterval(checkWS);
-                            // تعيين حالة الفيلم
                             currentState.video = '{servers[0] if servers else ''}';
                             currentState.title = '{title}';
                             currentState.servers = {servers_json};
                             currentState.server_index = 0;
                             
-                            // إرسال التحديث
                             ws.send(JSON.stringify({{
                                 action: 'sync_update',
                                 state: currentState
                             }}));
                             
-                            // تحميل الفيديو
                             loadVideo(currentState.video);
                             renderServers(currentState.servers, 0);
                             movieInfoText.textContent = '🎬 {title}';
@@ -1605,13 +1491,14 @@ async def run_web_server():
 
     app.middlewares.append(cors_middleware)
 
-    print("\n🌐 Web Server: http://localhost:8080")
-    print("🔗 Sync Watch: http://localhost:8080/sync")
-    print("🔗 WebSocket: ws://localhost:8080/ws")
+    port = int(os.environ.get('PORT', 8080))
+    print(f"\n🌐 Web Server: 0.0.0.0:{port}")
+    print(f"🔗 Sync Watch: /sync")
+    print(f"🔗 WebSocket: /ws")
 
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
 
     return runner
