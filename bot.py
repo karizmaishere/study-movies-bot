@@ -22,7 +22,7 @@ DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
 # APP_ID and GUILD_ID are hardcoded in the code
 DISCORD_APP_ID = "1531417241260658748"
 DISCORD_GUILD_ID = "1528402783194058792"
-WEB_URL = os.environ.get('WEB_URL', 'https://web-production-a64dd.up.railway.app')
+WEB_URL = "https://web-production-a64dd.up.railway.app"
 
 # Print configuration status
 print(f"🔑 TOKEN loaded: {bool(DISCORD_TOKEN)}")
